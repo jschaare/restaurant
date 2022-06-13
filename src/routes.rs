@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use crate::{
     db::{delete_order, find_all_orders, find_order, insert_order},
     models::{OrderCreate, OrderInput, TableInput},
+    utils::get_end_time,
 };
 
 #[post("/order")]
@@ -12,8 +13,9 @@ pub async fn create_order(item: web::Json<OrderCreate>, pool: web::Data<PgPool>)
     let item = item.into_inner();
     let mut rng = rand::thread_rng();
     let cook_time: i32 = rng.gen_range(5..15);
+    let end_time: chrono::NaiveDateTime = get_end_time(cook_time, chrono::Local::now().naive_utc());
 
-    match insert_order(&pool, item.item_name, item.table_id, cook_time).await {
+    match insert_order(&pool, item.item_name, item.table_id, cook_time, end_time).await {
         Some(order) => HttpResponse::Ok().json(order),
         None => HttpResponse::InternalServerError().json("Unable to insert item"),
     }
@@ -49,6 +51,7 @@ pub async fn get_table_orders(
     pool: web::Data<PgPool>,
 ) -> impl Responder {
     let item = item.into_inner();
-    let table_orders = find_all_orders(&pool, item.table_id).await;
+    let time_now = chrono::Local::now().naive_utc();
+    let table_orders = find_all_orders(&pool, item.table_id, time_now).await;
     HttpResponse::Ok().json(table_orders)
 }
